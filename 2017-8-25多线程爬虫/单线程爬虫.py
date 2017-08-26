@@ -101,7 +101,6 @@ def GetSoup():
     if soup.find('img', id='captcha_image'):
         print("有验证码")
         # 获取验证码图片地址
-        soup = BeautifulSoup(response_login, "html.parser")
         captchaAddr = soup.find('img', id='captcha_image')['src']
         # 匹配验证码id
         reCaptchaID = r'<input type="hidden" name="captcha-id" value="(.*?)"/'
