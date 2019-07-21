@@ -13,7 +13,8 @@ from PIL import Image
 from torchvision import transforms
 from tqdm import tqdm
 
-from model.CPD_ResNet_models import CPD_ResNet
+from BaseNet.ResNet import (Backbone_ResNet18 as Backbone_ResNet_18)
+from Networks.WeakNet import (FastSmallMFCNV5_B, SmallMFCNV5_B)
 
 
 def check_mkdir(dir_name):
@@ -28,7 +29,8 @@ class FPSer():
         self.to_pil = transforms.ToPILImage()
         self.proj_name = proj_name
         self.dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.net = self.args[proj_name]['net']().to(self.dev)
+        backbone = self.args[proj_name]['backbone']
+        self.net = self.args[proj_name]['net'](backbone).to(self.dev)
         self.net.eval()
 
         self.test_img_transform = transforms.Compose([
@@ -89,21 +91,31 @@ class FPSer():
 
 
 if __name__ == '__main__':
-    proj_list = ['CPD']
+    proj_list = ['FastSmallMFCNV5_B', 'SmallMFCNV5_B']
 
     arg_dicts = {
-        'CPD'      : {
-            'net'      : CPD_ResNet,
-            'exp_name' : 'CPD_ResNet',
+        'FastSmallMFCNV5_B': {
+            'net'      : FastSmallMFCNV5_B,
+            'backbone' : Backbone_ResNet_18,
+            'pth_path' : None,  # '/home/lart/coding/Paper_Code/output/CPD/pth/final.pth'
+            'save_root': './output'  # 必须有
+        },
+        'SmallMFCNV5_B'    : {
+            'net'      : SmallMFCNV5_B,
+            'backbone' : Backbone_ResNet_18,
             'pth_path' : None,  # '/home/lart/coding/Paper_Code/output/CPD/pth/final.pth'
             'save_root': './output'  # 必须有
         },
 
-        'crop_size': 352,
+        'crop_size'        : 320,
     }
 
     data_dicts = {
+        # 'pascal-s': '/home/lart/Datasets/RGBSaliency/Pascal-S',
         'duts': '/home/lart/Datasets/RGBSaliency/DUTS/Test',
+        # 'ecssd': '/home/lart/Datasets/RGBSaliency/ECSSD',
+        # 'hku-is': '/home/lart/Datasets/RGBSaliency/HKU-IS',
+        # 'dutomron': '/home/lart/Datasets/RGBSaliency/DUT-OMRON',
     }
 
     for proj_name in proj_list:
