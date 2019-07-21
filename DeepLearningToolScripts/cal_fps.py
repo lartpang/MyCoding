@@ -76,7 +76,7 @@ class FPSer():
 
             inputs = test_data.to(self.dev)
             with torch.no_grad():
-                _, outputs = self.net(inputs)
+                outputs = self.net(inputs)  # 按照实际情况改写
             outputs_np = outputs.squeeze(0).cpu().detach()
 
             out_img = self.to_pil(outputs_np).resize(img_size)
