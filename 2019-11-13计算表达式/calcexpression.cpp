@@ -15,19 +15,13 @@ using namespace std;
 
 class ExpressionChecker {
 private:
-
-    static vector<string> GetNumRelationship(const string &in_string);
-
-    static bool IsChar(string in_string) {
+    static bool IsChar(char item) {
         // 可以是连续的英文字符
-        return (in_string[0] >= 'a' && in_string[0] <= 'z')
-               || (in_string[0] >= 'A' && in_string[0] <= 'Z');
+        return (item >= 'a' && item <= 'z') || (item >= 'A' && item <= 'Z');
     };
 
-    static bool IsOperator(string in_string) {
-        if (in_string.size() != 1) { return false; }
-        return in_string[0] == '+' || in_string[0] == '-'
-               || in_string[0] == '*' || in_string[0] == '/';
+    static bool IsDot(char item) {
+        return item == '.';
     };
 
     static bool IsOperator(char item) {
@@ -41,13 +35,12 @@ private:
 
     static double String2Number(string in_string);
 
+    static vector<string> GetNumRelationship(const string &in_string);
+
 public:
+    // todo: 完善更多计算模式的支持
     ExpressionChecker() {
         cout << "Init the Checker Class with default mode" << endl;
-    }
-
-    explicit ExpressionChecker(const string &mode) {
-        cout << "Init the Checker Class with " << mode << " mode" << endl;
     }
 
     ~ExpressionChecker() {
@@ -55,13 +48,16 @@ public:
     };
 
     // 过滤空白符
-    static void FilterWhitespace(string &in_string);
+    static bool FilterWhitespace(string &in_string);
 
-    // 检查括号匹配问题
-    static bool HasPairBrackets(const string &in_string);
+    // 检查括号匹配问题以及字符合法性，只能有括号和数字，字符，运算符（+,-,*,/)
+    static bool CharChecker(const string &in_string);
 
-    // 检查操作符是否正常
-    static bool OperatorChecker(string &in_string);
+    // 检查操作符是否正常，并调整--为+
+    static bool OperatorChecker(string in_string);
+
+    static bool DotChecker(string in_string);
+
 
     static vector<string> NegativeChecker(string in_string);
 
@@ -127,21 +123,32 @@ vector<string> ExpressionChecker::GetNumRelationship(const string &in_string) {
  * 2. 类型符号：f
  * 3. 只保留第一个分号之前的内容，没有分号的话，完全读取
  * */
-void ExpressionChecker::FilterWhitespace(string &in_string) {
+bool ExpressionChecker::FilterWhitespace(string &in_string) {
     string new_string;
     for (char i : in_string) {
-        if (i != ' ') {
-            if (i == ';') { break; }
+        if (!(i == '\t' || i == '\r' || i == '\n')) {
+            if (i == ';') {
+                break;
+            }
             new_string.push_back(i);
         }
     }
     in_string = new_string;
+
+    return !new_string.empty();
 }
 
-bool ExpressionChecker::HasPairBrackets(const string &in_string) {
+bool ExpressionChecker::CharChecker(const string &in_string) {
     stack<char> bracket_stack;
-    bool state = false;
 
+    // 检查符号合法问题
+    for (char i : in_string) {
+        // 不满足合理范围
+        if (!(IsOperator(i) || IsNum(i) || IsChar(i) || IsDot(i))) {
+            return false;
+        }
+    }
+    // 检查括号匹配问题
     for (char i : in_string) {
         if (i == '(') {
             bracket_stack.push('(');
@@ -150,15 +157,11 @@ bool ExpressionChecker::HasPairBrackets(const string &in_string) {
         }
     }
 
-    if (bracket_stack.empty()) {
-        state = true;
-    }
-
-    return state;
+    return bracket_stack.empty();
 }
 
 // 只允许有连续的-号，即--
-bool ExpressionChecker::OperatorChecker(string &in_string) {
+bool ExpressionChecker::OperatorChecker(string in_string) {
     string positive_str;
 
     // 开头不允许有两个操作符，结尾不允许有操作符
@@ -200,6 +203,10 @@ bool ExpressionChecker::OperatorChecker(string &in_string) {
     in_string = positive_str;
 
     return true;
+}
+
+bool ExpressionChecker::DotChecker(string in_string) {
+    return in_string.find('.') == in_string.rfind('.');
 }
 
 // 向负号前插0来保证都是正数，需要提前检查连续符号的合理性(使用过程中有连续符号必须加括号)
@@ -298,12 +305,12 @@ bool ExpressionChecker::CalcExpression(const vector<string> &in_string, double &
 
     // 将变量全部入栈
     for (string i : in_string) {
-        if (IsChar(i)) {
+        if (IsChar(i[0])) {
             // 存在字母的式子是不需要计算的
             return false;
         }
 
-        if (IsOperator(i)) {
+        if (IsOperator(i[0])) {
             top_1 = num_stack.top();
             num_stack.pop();
             top_2 = num_stack.top();
@@ -337,6 +344,7 @@ bool ExpressionChecker::CalcExpression(const vector<string> &in_string, double &
     return true;
 }
 
+
 int main() {
     string linebuf;
     stack<char> exper_stack;
@@ -351,25 +359,31 @@ int main() {
         cout << "Success to open file" << endl;
         while (getline(fin, linebuf)) // line中不包括每行的换行符
         {
-            cout << " Source string " << linebuf << endl;
-            checker.FilterWhitespace(linebuf);
-
+            cout << "原始字符串：" << linebuf << endl;
+            if (!checker.FilterWhitespace(linebuf)) {
+                continue;
+            }
             if (!checker.OperatorChecker(linebuf)) {
-                cout << " Error: 表达式运算符不合法" << endl;
+                cout << "表达式非法" << endl;
                 continue;
             }
-            if (!checker.HasPairBrackets(linebuf)) {
-                cout << " Error: 表达式括号不合法" << endl;
+            if (!checker.CharChecker(linebuf)) {
+                cout << "表达式非法" << endl;
                 continue;
             }
+            if (!checker.DotChecker(linebuf)) {
+                cout << "表达式非法" << endl;
+                continue;
+            }
+
 
             item_vec = checker.NegativeChecker(linebuf);
             checker.TransPostfixExpression(item_vec);
 
             if (checker.CalcExpression(item_vec, result)) {
-                cout << " CalcExpression num " << result << endl;
+                cout << "输出结果：" << result << endl;
             } else {
-                cout << " 运算合法 " << endl;
+                cout << "表达式合法" << endl;
             }
         }
     } else  // 文件打开失败
