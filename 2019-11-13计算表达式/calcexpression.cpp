@@ -6,7 +6,6 @@
 #include <fstream>
 #include <string>
 #include <stack>
-#include <utility>
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -16,6 +15,7 @@ using namespace std;
 class ExpressionChecker {
 private:
     string modified_str;
+    bool can_calc;
 
     static bool IsChar(char item) {
         // 可以是连续的英文字符
@@ -46,10 +46,16 @@ private:
 public:
     void SetPrivateVar(string in_string) { modified_str = std::move(in_string); };
 
-    string GetPrivateVar() { return modified_str; };
+    void SetPrivateVar(bool in_state) { can_calc = in_state; };
+
+    string GetString() { return modified_str; };
+
+    bool GetExpressionState() { return can_calc; };
 
     // todo: 完善更多计算模式的支持
     ExpressionChecker() {
+        modified_str = "";
+        can_calc = true;
         cout << "Init the Checker Class with default mode" << endl;
     }
 
@@ -66,7 +72,7 @@ public:
     // 检查操作符是否正常，并调整--为+
     static bool IsOperatorValid(string in_string);
 
-    static bool IsFloatValid(vector<string> in_string);
+    bool IsFloatValid(const vector<string> &in_string);
 
 
     vector<string> NegativeChecker(string in_string);
@@ -77,7 +83,7 @@ public:
     */
     static void TransPostfixExpression(vector<string> &in_string);
 
-    static bool CalcExpression(const vector<string> &in_string, double &result);
+    bool CalcExpression(const vector<string> &in_string, double &result);
 };
 
 /*
@@ -251,8 +257,14 @@ bool ExpressionChecker::IsOperatorValid(string in_string) {
     return true;
 }
 
-// 点号的检查，点的左右必须是数字
-bool ExpressionChecker::IsFloatValid(vector<string> in_string) {
+/*
+ * 检查字符串中的浮点数合法性
+ * 主要原则：
+ * 1. 若存在点，左右必须是数字
+ * 2. 数字仅可以后接f
+ * 3. 其他的数字与字母混用的情况是不允许的
+ * */
+bool ExpressionChecker::IsFloatValid(const vector<string> &in_string) {
     int pos;
 
     for (string item:in_string) {
@@ -277,6 +289,8 @@ bool ExpressionChecker::IsFloatValid(vector<string> in_string) {
         if (!((num_num > 0 && num_char == 1 && has_last_f) || num_num == 0 || num_char == 0)) {
             return false;
         }
+        // 在上一个限定之后，判定该表达式是否为纯数字表达式或者仅包含f后缀
+        SetPrivateVar((num_num > 0 && num_char == 1 && has_last_f) || num_char == 0);
 
         // 开始检查小数情况下的合法性：对每项中的点号检查
         if (item.find('.') == item.rfind('.')) {
@@ -299,7 +313,10 @@ bool ExpressionChecker::IsFloatValid(vector<string> in_string) {
     return true;
 }
 
-// 向负号前插0来保证都是正数，需要提前检查连续符号的合理性(使用过程中有连续符号必须加括号)
+/*
+ * 负数检查
+ * 主要原则：向开头的负号，以及左括号后的负号前插0来保证数字不带负号
+ * */
 vector<string> ExpressionChecker::NegativeChecker(string in_string) {
     // -a+b和b+(-a)这样的
     for (int i = 0; i < in_string.size() - 1; ++i) {
@@ -314,15 +331,16 @@ vector<string> ExpressionChecker::NegativeChecker(string in_string) {
     return GetNumRelationship(in_string);
 }
 
-/* 中缀转换后缀表达式：
- * 当读到操作数时，立即把它输出，即成为后缀表达式的一部分；
- * 若读到操作符，判断该符号与栈顶符号的优先级:
- *      若该符号优先级高于栈顶元素，则将该操作符入栈，
- *      否则就一次把栈中运算符弹出并加到后缀表达式尾端，直到遇到优先级低于该操作符的栈元素，然后把该操作符压入栈中
- *      对于相同等级的运算符，后来的优先级更低
- * 如果遇到”(”，直接压入栈中
- * 如果遇到一个”)”，那么就将栈元素弹出并加到后缀表达式尾端，但左右括号并不输出。
- * 最后，如果读到中缀表达式的尾端，将栈元素依次完全弹出并加到后缀表达式尾端。
+/* 中缀转换后缀表达式
+ * 主要原则：
+ * 1. 当读到操作数时，立即把它输出，即成为后缀表达式的一部分；
+ * 2. 若读到操作符，判断该符号与栈顶符号的优先级:
+ *    * 若该符号优先级高于栈顶元素，则将该操作符入栈，
+ *    * 否则就一次把栈中运算符弹出并加到后缀表达式尾端，直到遇到优先级低于该操作符的栈元素，然后把该操作符压入栈中
+ *    * 对于相同等级的运算符，后来的优先级更低
+ * 3. 如果遇到”(”，直接压入栈中
+ * 4. 如果遇到一个”)”，那么就将栈元素弹出并加到后缀表达式尾端，但左右括号并不输出。
+ * 5. 最后，如果读到中缀表达式的尾端，将栈元素依次完全弹出并加到后缀表达式尾端
  * */
 void ExpressionChecker::TransPostfixExpression(vector<string> &in_string) {
     vector<string> postfix_expr;
@@ -394,17 +412,23 @@ void ExpressionChecker::TransPostfixExpression(vector<string> &in_string) {
     in_string = postfix_expr;
 }
 
+/*
+ * 计算表达式
+ * 主要原则：
+ * 仅计算纯数字运算，或者有后缀f的数字项
+ * */
 bool ExpressionChecker::CalcExpression(const vector<string> &in_string, double &result) {
     stack<double> num_stack;
     double top_1 = 0, top_2 = 0;
 
+    if (!GetExpressionState()) {
+        // 存在字母的式子是不需要计算的
+        // 根据状态can_calc来判定是否需要进一步计算
+        return false;
+    }
+
     // 将变量全部入栈
     for (string i : in_string) {
-        if (IsChar(i[0])) {
-            // 存在字母的式子是不需要计算的
-            return false;
-        }
-
         if (IsOperator(i[0])) {
             top_1 = num_stack.top();
             num_stack.pop();
@@ -479,7 +503,7 @@ int main() {
             } else {
                 cout << "表达式合法" << endl;
             }
-            cout << " ==>> 获得的表达式：" << checker.GetPrivateVar() << endl;
+            cout << " ==>> 获得的表达式：" << checker.GetString() << endl;
         }
     } else  // 文件打开失败
     {
