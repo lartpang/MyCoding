@@ -219,43 +219,6 @@ bool ExpressionChecker::IsOperatorValid(string in_string) {
         }
     }
 
-    /*
-    // 开头不允许有两个操作符，结尾不允许有操作符
-    if (IsOperator(in_string[0]) && IsOperator(in_string[1])) {
-        return false;
-    }
-    if (IsOperator(in_string[in_string.size() - 1])) {
-        return false;
-    }
-
-    // 保证 **仅可能存在连续两个-运算符**，而且末尾的必须是数字或者变量
-    positive_str.push_back(in_string[0]);
-    positive_str.push_back(in_string[1]);
-    for (int i = 1; i < in_string.size() - 1; ++i) {
-        positive_str.push_back(in_string[i + 1]);
-
-        // 连续两个操作符的基础上进行讨论
-        if (i < in_string.size() - 2
-            && IsOperator(in_string[i])
-            && IsOperator(in_string[i + 1])) {
-            if (IsOperator(in_string[i + 2])) {
-                // 连续三个
-                return false;
-            } else {
-                if (!(in_string[i] == '-' && in_string[i + 1] == '-')) {
-                    // 两个的时候 非--
-                    return false;
-                } else {
-                    // --存在
-                    // -- => +, b--a这样的
-                    positive_str.pop_back();
-                    positive_str.pop_back();
-                    positive_str.push_back('+');
-                }
-            }
-        }
-    }
-     */
     return true;
 }
 
