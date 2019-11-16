@@ -1,8 +1,8 @@
 /*
- * @Author: 庞有伟
+ * @Author: Lart Pang
  * @Date: 2019/11/14
  * @Discribe:
- * 1. 四则运算：利用后缀表达式配合堆栈结构来进行计算
+ * 1. 四则运算（Default模式）：利用后缀表达式配合堆栈结构来进行计算
  * 1.1 整数、小数(可以尾随f)，以及字符常量(a~z、A~Z)的加减乘除形式
  * 1.2 可以使用括号调整计算顺序
  * 1.3 对于各种不合法的输入形式进行了判定，不合法的输出位“表达式非法”
@@ -11,13 +11,16 @@
  * 1.5 对于数字表达式会输出对应的运算结果
  * 1.6 在exp.txt中，当行内存在;号的时候，仅计算;之前的部分
  * 1.7 在exp.txt中，当以//开头的行，会认为是注释，会被跳过
- * 2. S-表达式：
- * 通过将S-表达式转化为通常使用的表达式，之后再利用1中的流程进行处理
+ * 2. S-表达式（Sexpr模式）：通过将S-表达式转化为通常使用的表达式，
+ * 之后再利用1中的流程进行处理
  * 2.1 对于基本的两个数字的S表达式运算给予了支持，S-表达式例如(Operator num1
  * num2)、(Operator num1)的形式
  * 2.2 仅支持数字之间的运算，不能使用任何字母，可以有小数点
  * 2.3 对于非法输入进行了判定与报错，提示“表达式非法”，合法计算会输出结果
  * 2.4 不支持注释，但是可以随便写一点非S-表达式作为注释，会对应输出表达式非法
+ * @Usage: 请使用我提供的相同文件夹下的exp.txt测试：
+ *      Default模式，请删除文件中“// S-表达式测试”之后内容
+ *      Sexpr模式请删除该行及之前的内容
  */
 
 #include <algorithm>
@@ -382,7 +385,7 @@ bool StackExprChecker::IsValid(string in_string, vector<string> &item_vec) {
       }
     }
   }
-  if (num_lbracket != 0 || IsOperator(c_stack.top()) || IsDot(c_stack.top())) {
+  if (num_lbracket != 0 || IsOperator(c_stack.top())) {
     return false;
   }
   SetPrivateVar(onlynum);
@@ -669,7 +672,7 @@ void StackExprChecker::Run(string in_string) {
   vector<string> item_vec;
   double result = 0;
   int state;
-  if (GetCalcMode() == "default") {
+  if (GetCalcMode() == "Default") {
     SetPrivateVar(true);
     if (!FilterWhitespace(in_string)) {
       return;
@@ -703,22 +706,26 @@ void StackExprChecker::Run(string in_string) {
   }
 }
 
+/*
+ * @param: mode，
+ *      计算模式选择：
+ *      1. "Default": 默认四则运算
+ *      2. "Sexpr": S-表达式
+ * */
 int main() {
   string linebuf;
-  StackExprChecker checker("Sexpr");
+  StackExprChecker checker("Default");
 
   cout << "尝试读取文件..." << endl;
   ifstream fin("./exp.txt", ios::in);
-  if (fin.is_open()) // 文件成功打开
-  {
+  if (fin.is_open()) {
     cout << "成功打开文件，开始处理..." << endl;
     while (getline(fin, linebuf)) // line中不包括每行的换行符
     {
       cout << "原始字符串：" << linebuf << endl;
       checker.Run(linebuf);
     }
-  } else // 文件打开失败
-  {
+  } else {
     cout << "文件打开失败，请检查文件是否存在..." << endl;
     return -1;
   }
