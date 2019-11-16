@@ -1,6 +1,24 @@
-//
-// Created by lart on 2019/11/14.
-//
+/*
+ * @Author: 庞有伟
+ * @Date: 2019/11/14
+ * @Discribe:
+ * 1. 四则运算：利用后缀表达式配合堆栈结构来进行计算
+ * 1.1 整数、小数(可以尾随f)，以及字符常量(a~z、A~Z)的加减乘除形式
+ * 1.2 可以使用括号调整计算顺序
+ * 1.3 对于各种不合法的输入形式进行了判定，不合法的输出位“表达式非法”
+ * 1.4 对于表达式中包含非小数标识符f的字母的时候，判定为不可运算表达式，
+ * 会输出“表达式合法”的字样
+ * 1.5 对于数字表达式会输出对应的运算结果
+ * 1.6 在exp.txt中，当行内存在;号的时候，仅计算;之前的部分
+ * 1.7 在exp.txt中，当以//开头的行，会认为是注释，会被跳过
+ * 2. S-表达式：
+ * 通过将S-表达式转化为通常使用的表达式，之后再利用1中的流程进行处理
+ * 2.1 对于基本的两个数字的S表达式运算给予了支持，S-表达式例如(Operator num1
+ * num2)、(Operator num1)的形式
+ * 2.2 仅支持数字之间的运算，不能使用任何字母，可以有小数点
+ * 2.3 对于非法输入进行了判定与报错，提示“表达式非法”，合法计算会输出结果
+ * 2.4 不支持注释，但是可以随便写一点非S-表达式作为注释，会对应输出表达式非法
+ */
 
 #include <algorithm>
 #include <cmath>
@@ -57,11 +75,11 @@ public:
   string GetCalcMode() { return calc_mode; };
 
   // todo: 完善更多计算模式的支持
-  StackExprChecker(string mode) {
+  explicit StackExprChecker(string mode) {
     modified_str = "";
     can_calc = true;
     calc_mode = mode;
-    cout << "Init the Checker Class with " << mode << "mode" << endl;
+    cout << "Init the Checker Class with " << mode << " mode" << endl;
   }
 
   ~StackExprChecker() { cout << "Destroy the Checker Class..." << endl; };
@@ -79,7 +97,9 @@ public:
 
   int CalcExpression(const vector<string> &in_string, double &result);
 
-  bool CalcSExpr(string in_string, double &result);
+  static bool CalcSExpr(string in_string, double &result);
+
+  static int SExpr2MExpr(string &in_string);
 
   void Run(string in_string);
 };
@@ -255,12 +275,6 @@ bool StackExprChecker::IsValid(string in_string, vector<string> &item_vec) {
 
   for (int i = 0; i < in_string.size(); ++i) {
     // 保证合法字符
-    // if (!(IsOperator(in_string[i]) || IsNum(in_string[i]) ||
-    //    IsChar(in_string[i]) || IsDot(in_string[i]) ||
-    //    IsPair(in_string[i]))) {
-    //    return false;
-    //}
-
     if (i == 0) {
       // 1. 首字符必须是负号配数字或者字母开头或者数字开头
       if (IsChar(in_string[0])) {
@@ -294,12 +308,13 @@ bool StackExprChecker::IsValid(string in_string, vector<string> &item_vec) {
       //    则onlynum=false，不要置为true的语句
       // 3. 括号不可单独存在或者反向存在或者中间没有内容
       // 4. 不能有连续的运算符和点号
-      // 5. 运算符左侧必须为数字，字母，括号，右侧必须为数字，字母和右括号
+      // 5.
+      // 运算符左侧必须为数字，字母，括号，或者点号，右侧必须为数字，字母和右括号
       // 6. 浮点数的点号左侧只能是数字，右侧只能是数字或者f标记
       // 7. (- => (0-
       if (IsOperator(in_string[i])) {
-        if (IsOperator(c_stack.top()) || IsDot(c_stack.top())) {
-          // 连续两个操作符或者前为点号，非法
+        if (IsOperator(c_stack.top())) {
+          // 连续两个操作符，非法
           return false;
         } else if (c_stack.top() == '(' && in_string[i] == '-') {
           // (- => (0-
@@ -347,17 +362,16 @@ bool StackExprChecker::IsValid(string in_string, vector<string> &item_vec) {
           }
         }
       } else if (in_string[i] == '(') {
-        if (!(IsOperator(c_stack.top()))) {
-          // (前面只能是操作符
+        if (!(IsOperator(c_stack.top()) || c_stack.top() == '(')) {
+          // (前面只能是操作符或者左括号
           return false;
         } else {
           c_stack.push(in_string[i]);
           num_lbracket++;
         }
       } else if (in_string[i] == ')') {
-        if (c_stack.top() == '(' || IsOperator(c_stack.top()) ||
-            IsDot(c_stack.top())) {
-          // (前为(或运算符或点号，非法
+        if (c_stack.top() == '(' || IsOperator(c_stack.top())) {
+          // )前为(或运算符，非法
           return false;
         } else {
           c_stack.push(in_string[i]);
@@ -439,94 +453,213 @@ int StackExprChecker::CalcExpression(const vector<string> &in_string,
 }
 
 /*
- * S表达式的检查与计算
- * 主要原则：
- * 1. 首为( 尾是)
- * 2. 每个运算符之前都是(，若存在空格可以删除至(
- * 3. 括号都需要匹配
- * 4. 只存在正负数，0，小数，运算符，括号
- * 5. 数字与运算符之间有空格
- * 6. 存在括号的时候必须存在运算符
- * */
-bool StackExprChecker::CalcSExpr(string in_string, double &result) {
-  string new_string;
-  stack<string> calc_stack;
-  stack<string> aux_stack;
+ * S表达式转化为中缀表达式，之后可以借用TransPostfixExpression来计算
+ **/
+int StackExprChecker::SExpr2MExpr(string &in_string) {
+  // 检查字符，检查括号匹配，插入必要的空格
   int num_lbracket = 0;
-  bool cleaned_beginbracket = false;
-
-  // 检查字符，删减空格
+  bool has_cleaned = false;
+  string valid_char_str;
   for (int i = 0; i < in_string.size(); ++i) {
     if (!(IsSpaceOrTab(in_string[i]) || IsNum(in_string[i]) ||
           IsDot(in_string[i]) || IsPair(in_string[i]) ||
           IsOperator(in_string[i]))) {
-      return false;
+      return -1;
     }
-
-    if (i > 0 && IsSpaceOrTab(in_string[i]) && IsSpaceOrTab(in_string[i - 1])) {
-      continue;
-    }
-
-    // 跳过开头的空格
-    if (!cleaned_beginbracket) {
-      if (IsSpaceOrTab(in_string[i])) {
-        continue;
-      } else {
-        cleaned_beginbracket = true;
-      }
-    }
-
-    // 都是合法字符
-    // ( -  2 -3 ) => (- 2 (- 0 3))
-    if (i > 0 && (in_string[i - 1] == '+' || in_string[i - 1] == '-') &&
-        IsNum(in_string[i])) {
-      return false;
-    } else {
-      new_string.push_back(in_string[i]);
-    }
-
+    valid_char_str.push_back(in_string[i]);
     // 检查括号的合法性
     if (in_string[i] == '(') {
+      if (valid_char_str.size() > 1 &&
+          !IsSpaceOrTab(valid_char_str[valid_char_str.size() - 2])) {
+        valid_char_str.pop_back();
+        valid_char_str.push_back(' ');
+        valid_char_str.push_back(in_string[i]);
+        valid_char_str.push_back(' ');
+      } else if (i < in_string.size() - 1 && !IsSpaceOrTab(in_string[i + 1])) {
+        valid_char_str.push_back(' ');
+      }
       num_lbracket++;
     } else if (in_string[i] == ')') {
+      if (!IsSpaceOrTab(valid_char_str[valid_char_str.size() - 2])) {
+        valid_char_str.pop_back();
+        valid_char_str.push_back(' ');
+        valid_char_str.push_back(in_string[i]);
+        valid_char_str.push_back(' ');
+      }
       num_lbracket--;
     }
     if (num_lbracket < 0) {
-      return false;
+      // 先有了右括号
+      return -1;
     }
   }
   if (num_lbracket != 0) {
-    return false;
-  }
-  if (IsSpaceOrTab(new_string[new_string.size() - 1])) {
-    new_string.pop_back();
+    return -1;
   }
 
-  cout << new_string << endl;
+  // 删除多余的空格
+  string cleaned_space_str;
+  for (int i = 0; i < valid_char_str.size(); ++i) {
+    // 连续的空格仅保留一个
+    if (i > 0 && IsSpaceOrTab(valid_char_str[i]) &&
+        IsSpaceOrTab(valid_char_str[i - 1])) {
+      continue;
+    }
+    // 跳过开头的空格
+    if (!has_cleaned) {
+      if (IsSpaceOrTab(valid_char_str[i])) {
+        continue;
+      } else {
+        has_cleaned = true;
+      }
+    }
+    cleaned_space_str.push_back(valid_char_str[i]);
+  }
+  if (IsSpaceOrTab(cleaned_space_str[cleaned_space_str.size() - 1])) {
+    cleaned_space_str.pop_back();
+  }
 
+  // 跳过空行和注释行
+  bool all_whitesapce = true;
+  for (char item : cleaned_space_str) {
+    if (all_whitesapce && !IsSpaceOrTab(item)) {
+      all_whitesapce = false;
+    }
+  }
+  if (all_whitesapce) {
+    return 0;
+  }
+
+  // 检查单项运算，将所有的单项转化为括号形式
+  bool non_end = false;
+  bool need_more = false;
+  bool need_more_if = false;
+  string non_single_str;
+
+  non_single_str.push_back(cleaned_space_str[0]);
+  for (int i = 1; i < cleaned_space_str.size(); ++i) {
+    if (cleaned_space_str.size() - i >= 3 && cleaned_space_str[i - 1] == '(' &&
+        IsSpaceOrTab(cleaned_space_str[i]) &&
+        (cleaned_space_str[i + 1] == '+' || cleaned_space_str[i + 1] == '-') &&
+        IsNum(cleaned_space_str[i + 2])) {
+      // 特定错误模板检查
+      return -1;
+    }
+
+    if (cleaned_space_str.size() - i >= 4 && cleaned_space_str[i - 1] == '(' &&
+        IsSpaceOrTab(cleaned_space_str[i]) &&
+        IsOperator(cleaned_space_str[i + 1]) &&
+        IsSpaceOrTab(cleaned_space_str[i + 2]) &&
+        IsNum(cleaned_space_str[i + 3])) {
+      need_more = true;
+    } else if (need_more) {
+      // 前面是数字
+      if (cleaned_space_str.size() - i >= 3 &&
+          (IsNum(cleaned_space_str[i]) || IsDot(cleaned_space_str[i]))) {
+        if (IsSpaceOrTab(cleaned_space_str[i + 1]) &&
+            cleaned_space_str[i + 2] == ')') {
+          need_more = false;
+          need_more_if = true;
+        } else if (IsSpaceOrTab(cleaned_space_str[i + 1]) &&
+                   (IsOperator(cleaned_space_str[i + 2]) ||
+                    IsNum(cleaned_space_str[i + 2]))) {
+          need_more = false;
+        } else if (!(IsDot(cleaned_space_str[i]) ||
+                     IsNum(cleaned_space_str[i]))) {
+          return -1;
+        }
+      }
+    }
+
+    if ((cleaned_space_str[i - 1] == '+' || cleaned_space_str[i - 1] == '-') &&
+        IsNum(cleaned_space_str[i])) {
+      non_single_str.pop_back();
+      non_single_str.push_back('(');
+      non_single_str.push_back(' ');
+      non_single_str.push_back(cleaned_space_str[i - 1]);
+      non_single_str.push_back(' ');
+      non_single_str.push_back('0');
+      non_single_str.push_back(' ');
+      non_single_str.push_back(cleaned_space_str[i]);
+      non_end = true;
+    } else if (non_end) {
+      if (IsNum(cleaned_space_str[i]) || IsDot(cleaned_space_str[i])) {
+        non_single_str.push_back(cleaned_space_str[i]);
+      } else {
+        non_single_str.push_back(' ');
+        non_single_str.push_back(')');
+        non_single_str.push_back(cleaned_space_str[i]);
+        non_end = false;
+      }
+    } else {
+      non_single_str.push_back(cleaned_space_str[i]);
+    }
+  }
+  // 前面的操作可能会缺一个末尾的括号
+  if (non_single_str[non_single_str.size() - 1] != ')') {
+    non_single_str.push_back(' ');
+    non_single_str.push_back(')');
+  }
+
+  // 主要针对 (+ 1) (- 1) (* 1) (/ 1) 这样的形式
+  if (need_more_if) {
+    for (int i = 0; i < non_single_str.size(); ++i) {
+      if (IsOperator(non_single_str[i])) {
+        if (non_single_str[i] == '-' || non_single_str[i] == '+') {
+          non_single_str.insert(i + 1, 1, ' ');
+          non_single_str.insert(i + 2, 1, '0');
+        } else if (non_single_str[i] == '*' || non_single_str[i] == '/') {
+          non_single_str.insert(i + 1, 1, ' ');
+          non_single_str.insert(i + 2, 1, '1');
+        }
+      }
+    }
+  }
+
+  // 检查S表达式中运算符的合法性
+  string over_str;
+  over_str.push_back(non_single_str[0]);
+  for (int i = 1; i < non_single_str.size(); ++i) {
+    if (IsOperator(non_single_str[i - 1]) && !IsSpaceOrTab(non_single_str[i])) {
+      // 运算符右侧必须是空格
+      return -1;
+    } else {
+      over_str.push_back(non_single_str[i]);
+    }
+  }
+
+  // S表达式转化为中缀表达式，前面需要保证:
+  vector<string> aux_vec;
   string temp_str;
-  for (char item : new_string) {
-    if (IsSpaceOrTab(item)) {
-      calc_stack.push(temp_str);
+  for (char item_c : over_str) {
+    temp_str.push_back(item_c);
+    if (IsSpaceOrTab(item_c)) {
+      temp_str.pop_back();
+      aux_vec.push_back(temp_str);
       temp_str = " ";
       temp_str.pop_back();
       continue;
     }
-    temp_str.push_back(item);
   }
-  calc_stack.push(temp_str);
+  aux_vec.push_back(temp_str);
 
-  while (!calc_stack.empty()) {
-    if (IsOperator(calc_stack.top()[0])) {
-      // todo
-    } else if () {
-    } else {
-      aux_stack.push(calc_stack.top());
+  for (int i = 0; i < aux_vec.size() - 1; ++i) {
+    if (IsOperator(aux_vec[i][0]) && IsNum(aux_vec[i + 1][0])) {
+      temp_str = aux_vec[i];
+      aux_vec[i] = aux_vec[i + 1];
+      aux_vec[i + 1] = temp_str;
+      i++;
     }
   }
 
-  result = 0;
-  return true;
+  // 将vector中的各项string拼接在一起
+  string out_str;
+  for (const string &item_str : aux_vec) {
+    out_str += item_str;
+  }
+
+  in_string = out_str;
+  return 1;
 }
 
 /*
@@ -536,35 +669,37 @@ void StackExprChecker::Run(string in_string) {
   vector<string> item_vec;
   double result = 0;
   int state;
-
   if (GetCalcMode() == "default") {
     SetPrivateVar(true);
     if (!FilterWhitespace(in_string)) {
       return;
     }
-    if (!IsValid(in_string, item_vec)) {
+  } else if (GetCalcMode() == "Sexpr") {
+    state = SExpr2MExpr(in_string);
+    if (state == -1) {
       cout << "表达式非法" << endl;
       return;
-    }
-    TransPostfixExpression(item_vec);
-    state = CalcExpression(item_vec, result);
-    if (state == 1) {
-      cout << result << endl;
     } else if (state == 0) {
-      cout << "表达式合法" << endl;
-    } else if (state == -1) {
-      cout << "表达式非法" << endl;
+      return;
     }
-  } else if (GetCalcMode() == "Sexpr") {
-    cout << "正在使用Sepr模式" << endl;
-    if (!CalcSExpr(in_string, result)) {
-      cout << "S表达式非法" << endl;
-    } else {
-      cout << "S表达式 " << in_string << " 的结果为：" << result << endl;
-    }
+    // state == 1的时候继续
   } else {
     cout << "未实现的运算模式" << endl;
     return;
+  }
+
+  if (!IsValid(in_string, item_vec)) {
+    cout << "表达式非法" << endl;
+    return;
+  }
+  TransPostfixExpression(item_vec);
+  state = CalcExpression(item_vec, result);
+  if (state == 1) {
+    cout << result << endl;
+  } else if (state == 0) {
+    cout << "表达式合法" << endl;
+  } else if (state == -1) {
+    cout << "表达式非法" << endl;
   }
 }
 
