@@ -7,9 +7,10 @@ import hashlib
 import hmac
 import base64
 import argparse
+import getpass
 
 
-def shansing(args):
+def shansing(args, *, basepassword=None, code=None):
     """
     A python implement of the core encryption process of the great tool: <https://shansing.com/passwords/>
 
@@ -40,8 +41,13 @@ def shansing(args):
     - [🌟🌟] https://shansing.com/read/477/
     - https://zhuanlan.zhihu.com/p/148364711
     """
-    base_pw: str = args.basepassword
-    code: str = args.code
+    if args is not None:
+        base_pw: str = args.basepassword
+        code: str = args.code
+    else:
+        assert basepassword is not None and code is not None
+        base_pw: str = basepassword
+        code: str = code
     symbol: str = "!@#$%!@#$%!@#$%!@#$%!@#$%!@#$%"
 
     hex_hash_str = hmac.new(key=code.encode(), msg=base_pw.encode(), digestmod=hashlib.sha256).hexdigest()
@@ -74,7 +80,7 @@ def shansing(args):
     print(code16)
 
 
-def flowerpassword(args):
+def flowerpassword(args, *, basepassword=None, code=None):
     """
     A python implement of the core encryption process of the great tool: <https://flowerpassword.com>
 
@@ -105,8 +111,13 @@ def flowerpassword(args):
     - https://gitee.com/batcom/flower/blob/master/pw.py
     - https://xlsdg.org/p/68f1da70.html
     """
-    base_pw: str = args.basepassword
-    code: str = args.code
+    if args is not None:
+        base_pw: str = args.basepassword
+        code: str = args.code
+    else:
+        assert basepassword is not None and code is not None
+        base_pw: str = basepassword
+        code: str = code
     upper_code: str = "sunlovesnow1990090127xykab"
 
     md5_str1 = hmac.new(key=code.encode(), msg=base_pw.encode(), digestmod=hashlib.md5).hexdigest().encode("utf-8")
@@ -149,5 +160,21 @@ def get_args():
     args.func(args)
 
 
-if __name__ == "__main__":
-    get_args()
+def get_info():
+    print("A python tool for encrypting your password.")
+    mode = input("Mode [flower, shansing]: ")
+    basepassword = getpass.getpass("A single string used as the base password: ")
+    code = getpass.getpass("A mnemonic string used to distinguish passwords: ")
+
+    if mode == "flower":
+        print("A argument group for the flower mode. This mode is the same as <https://flowerpassword.com>.")
+        flowerpassword(args=None, basepassword=basepassword, code=code)
+    elif mode == "shansing":
+        print("A argument group for the shansing mode. This mode is the same as <https://shansing.com/passwords/>.")
+        shansing(args=None, basepassword=basepassword, code=code)
+    else:
+        raise NotImplementedError
+
+if __name__ == '__main__':
+    # get_args()  # This is not safe enough.
+    get_info()
